@@ -1,0 +1,36 @@
+****USING DEFAULT MAC ADDRESS - AA:AA:AA:AA:AA:AA
+Will use NIC 'Broadcom NetLink (TM) Gigabit Ethernet'
+Using PacketDriverVersion 3.
+
+
+Doing a soft rest before proceeding...
+Soft reset passed !
+
+Data sending phase started...
+Reading in challeneges to inputvalue
+Challenge A is : 17, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 
+Challenge B is : 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 19, 
+End of inputs. Data ready.
+
+Writing inputs to FPGA...
+Write success !
+
+Issued a run signal
+Run command issue success !
+
+Allowed a waitTimeOut of : 10 secs
+User code exectution completed successfully !
+
+Atempting to read back responses
+Read back from memory success !
+
+The responses are : 
+31, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 31, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 
+End of Outputs
+
+Operation complete !
+	Executed in 0 ms
+
+
+
+Enter any value and press enter to exit
