@@ -15,6 +15,15 @@
 //	Bugs
 //	Due to a bug in the hardware code responses actually start from memory address 01 and till memory addresss 32. So we read back 1 bit more to adjust for the offset.
 
+//Enter operands here
+//32-bit operands integer
+//Hex value is AAAA AAAA
+//Binary equivalent will be 101010101010.....101010 32-bits
+#define A 2863311530
+#define B 2863311530
+#define WRITE_SIZE 1024	// 16(# config bytes per bit) * 64 (total # in both cores combined)
+#define READ_SIZE 4		// 32-bit results is read back as 4 8-bit values
+
 #include <windows.h>
 #include <WinIoctl.h>
 #include <setupapi.h>
@@ -48,7 +57,17 @@ void error(string inErr){
 int main(int argc, char* argv[]){
 	int i=0;
 
-	//Challenges as integer arrays
+	//Operands
+	int OpA = A;
+	int OpB = B;
+
+	//Configuration bits for each bit in each core
+	int core0[32][16];
+	int core1[32][16];
+
+	//Assign configuration bits here. This is temporary. Will be read from file later.
+	//core0[0][]
+	
 	int challengeA[16] = {17,1,2,3,4,5,6,7,8,9,10,11,12,13,1,15};
 	int challengeB[16] = {15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,19};	
 
