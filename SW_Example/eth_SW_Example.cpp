@@ -28,6 +28,8 @@
 #include <vector>
 #include <time.h>
 #include <direct.h>
+#include <math.h>
+#include <sstream>
 
 #include "sirc_internal.h"
 #include "display.h"
@@ -45,10 +47,24 @@ void error(string inErr){
 	exit(-1);
 }
 
-int main(int argc, char* argv[]){
-	int i=0;
+string get8bitBinary(int n){
+	int k;
+	std::string s;
+    std::stringstream out;
+	for(int i=7; i>=0; i--){
+		k = n/(pow(2.0,i));
+		n = n%((int)pow(2.0,i));
+		out<<k;
+		s = out.str();
+	}
+	return s;
+}
 
-	//Challenges as integer arrays
+int main(int argc, char* argv[]){
+	cout<<get8bitBinary(4);
+
+	//Configuration bits as integer arrays.
+	//The code will attempt to read values from file and if that fails then the below values will be used
 	int configTop[16]	 = {0,2,0,0,0,0,0,0};
 	int configBottom[16] = {0,0,0,0,0,0,255,255};
 
@@ -222,6 +238,34 @@ int main(int argc, char* argv[]){
 	//	Input buffer	 - 128-configuration bits. 64 for top line, 64 for bottom line.
 	//	Output			 - 16-bit response from the PUF
 
+	//0 - read config data specified in the begining of this file
+	//1 - read config data from file
+	//The source will be decided depending upon the availability of proper config data in the text file
+	bool configSource = 0;
+
+	//Attempting to read configuration data from config.txt
+	string configVector;
+	ifstream configFile ("config.txt");
+	char num[10];
+	int configFileData[16];
+	int n = 0;
+	if (configFile.is_open()){
+		cout << endl << "Reading from config file..." << endl;
+		while (configFile.good() && n!=16){
+			configFile.getline (num, 256, ',');
+			configFileData[n] = atoi(num);
+			n++;
+		}
+		configFile.close();
+	} else{
+		cout << endl << "Unable to open file challenges file. Assigning default challenges.." << endl;
+	}
+
+	//Deciding the source of config bits
+	if(n==16)
+		configSource = 1;
+
+	
 	//cout << "Data sending phase started..." << endl;
 
 	inputValues = (uint8_t *) malloc(sizeof(uint8_t) * numOpsWrite);
@@ -233,14 +277,29 @@ int main(int argc, char* argv[]){
 	//cout<<"Reading in configuration bits to inputvalue"<<endl;
 	
 	cout<<"Configuration for TOP line:    ";
-	for(int i = 0; i < 8; i++){
-		inputValues[i] = configTop[i];
-		cout<<(int)inputValues[i]<<", ";
+	if(!configSource){
+		for(int i = 0; i < 8; i++){
+			inputValues[i] = configTop[i];
+			cout<<(int)inputValues[i]<<", ";
+		}
+	} else{
+		for(int i = 0; i < 8; i++){
+			inputValues[i] = configFileData[i];
+			cout<<(int)inputValues[i]<<", ";
+		}
 	}
+
 	cout<<endl<<"Configuration for BOTTOM line: ";
-	for(int i = 0; i < 8; i++){
-		inputValues[i+8] = configBottom[i];
-		cout<<(int)inputValues[i+8]<<", ";
+	if(!configSource){
+		for(int i = 0; i < 8; i++){
+			inputValues[i+8] = configBottom[i];
+			cout<<(int)inputValues[i]<<", ";
+		}
+	} else{
+		for(int i = 0; i < 8; i++){
+			inputValues[i+8] = configFileData[i+8];
+			cout<<(int)inputValues[i+8]<<", ";
+		}
 	}
 	cout<<endl;
 	
@@ -313,7 +372,7 @@ int main(int argc, char* argv[]){
 	//Verify that the values are correct
 	cout<<"The responses are : ";
 	for(int i = 1; i < (numOpsRead+1); i++){
-		cout<<(int)outputValues[i]<<", ";
+		cout<<get8bitBinary((int)outputValues[i])<<" ";
 	}
 	//cout<<endl<<"End of Outputs"<<endl<<endl;
 	cout << endl << "Operation complete !" << "\tExecuted in " << (end - start) << " ms" << endl << endl;

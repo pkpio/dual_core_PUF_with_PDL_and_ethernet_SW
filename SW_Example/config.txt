@@ -1,0 +1,12 @@
+255,255,255,255,255,63,0,0,
+255,255,255,255,255,255,255,255,
+
+#Line 1 is for top line
+#Line 2 is for bottom line
+Notes:
+255 - 1111 1111
+63  - 0011 1111
+15  - 0000 1111
+3   - 0000 0011
+1   - 0000 0001
+Do NOT write anything before/in the first 2 lines
