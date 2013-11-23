@@ -5,16 +5,22 @@
 //
 // Modified by	: Praveen Kumar Pendyala
 // Created		: 11/20/13 
-// Modified		: 11/22/13
+// Modified		: 11/23/13
 //
 // Description:
 // Send 128 bits of config data and 2 32-bit operands A, B as parameters
 // Receive 16-bit response through data read
 //
-//	Bugs
+//	Bugs:
 //	Due to a bug in the hardware code, responses actually start from memory address 1 and extend till memory addresss 3.
 //	So we read back 1 bit more to adjust for the offset.
-
+//
+//  Notes:
+//	Interpretation of response: The response of the output has to be interpreted in the format mentioned below
+//	bit15 bit14 bit13 bit12 bit11 bit10 bit9 bit8   bit7 bit6 bit5 bit4 bit3 bit2 bit1 bit0 an example of output is,
+//  00001010 10100001. Here, 0th bit is 1, 7th - 1, 8th - 1, 15th - 0 
+//
+//
 #include <windows.h>
 #include <WinIoctl.h>
 #include <setupapi.h>
@@ -39,6 +45,31 @@ using namespace System;
 using namespace System::IO;
 using namespace System::Collections;
 
+
+//################################	Start of Global variables ####################################
+#define runSize 1000 //# times output should be evaluated for same challenge
+
+//Configuration bits as integer arrays.
+//The code will attempt to read values from file and if that fails then the below values will be used
+int configTop[16]	 = {0,2,0,0,0,0,0,0};
+int configBottom[16] = {0,0,0,0,0,0,255,255};
+
+uint32_t A = 0xffffffff;//operand A
+uint32_t B = 0x00000000;//operand B
+	
+uint32_t numOpsWrite = 16;	//write Length;
+uint32_t numOpsRead = 2;	//read Length;
+
+//For couting #1's in 100 runs for each bits. Initialized to 0 for each bit.
+int nOfOnes[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+//################################	End of Global variables ####################################
+
+
+
+
+//################################	Start of other function ####################################
+
 void error(string inErr){
 	cerr << "Error:" << endl;
 	cerr << "\t" << inErr << endl;
@@ -60,24 +91,45 @@ string get8bitBinary(int n){
 	return s;
 }
 
-int main(int argc, char* argv[]){
-	cout<<get8bitBinary(4);
+void adjustCounters(bool byteNum, int val){
+	int k;
+	//The current val is for the 1st 8-bits of response
+	if(!byteNum){
+		for(int i=7; i>=0; i--){
+			k = val/(pow(2.0,i));
+			if(k == 1)
+				nOfOnes[i]++;
+			val = val%((int)pow(2.0,i));
+		}
+	}
 
-	//Configuration bits as integer arrays.
-	//The code will attempt to read values from file and if that fails then the below values will be used
-	int configTop[16]	 = {0,2,0,0,0,0,0,0};
-	int configBottom[16] = {0,0,0,0,0,0,255,255};
+	//The current val is for the last 8-bits of response
+	else{
+		for(int i=7; i>=0; i--){
+			k = val/(pow(2.0,i));
+			if(k == 1)
+				nOfOnes[i+8]++;
+			val = val%((int)pow(2.0,i));
+		}
+	}
+}
+
+//################################	End of other function ####################################
+
+
+
+
+
+/*################################	Main function starts ####################################
+#############################################################################################*/
+
+int main(int argc, char* argv[]){
 
 	//Test harness variables
 	ETH_SIRC *SIRC_P;
 	uint8_t FPGA_ID[6];
 	bool FPGA_ID_DEF = false;
 
-	uint32_t A = 0xffffffff;//operand A
-	uint32_t B = 0x00000000;//operand B
-	
-	uint32_t numOpsWrite = 16;	//write Length;
-	uint32_t numOpsRead = 2;	//read Length;
 	uint32_t numOpsReturned;
 
 	cout<<endl<<endl;
@@ -319,63 +371,77 @@ int main(int argc, char* argv[]){
 		error(tempStream.str());
 	}
 
+
 	//Next, send the input data
 	//Start writing at address 0
+//############################################## LOOPING STARTS HERE ###########################################		
+	for(int i=0; i<runSize; i++){
+		cout<<endl<<"Run #"<<i;
 
-	//cout<<"Writing inputs to FPGA..."<<endl;
-	if(!SIRC_P->sendWrite(0, numOpsWrite, inputValues)){
-		tempStream << "Write to FPGA failed with code " << (int) SIRC_P->getLastError();
-		error(tempStream.str());
-	} else{
-		//cout<<"Write success !"<<endl<<endl;
-	}
-
-	//Set the run signal
-	//cout<<"Issued a run signal"<<endl;
-	if(!SIRC_P->sendRun()){
-		tempStream << "Run command failed with code " << (int) SIRC_P->getLastError();
-		error(tempStream.str());
-	} else{
-		//cout<<"Run command issue success !"<<endl<<endl;
-	}
-
-	//Wait up to N seconds for the execution to finish (we can compute ~500M numbers in that time)
-	if(waitTimeOut == 0){
-		//cout<<"Allowed a waitTimeOut of : 10 secs"<<endl;
-		if(!SIRC_P->waitDone(10)){
-			tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
+		//cout<<"Writing inputs to FPGA..."<<endl;
+		if(!SIRC_P->sendWrite(0, numOpsWrite, inputValues)){
+			tempStream << "Write to FPGA failed with code " << (int) SIRC_P->getLastError();
 			error(tempStream.str());
 		} else{
-			//cout<<"User code exectution completed successfully !"<<endl<<endl;
+			//cout<<"Write success !"<<endl<<endl;
 		}
-	}
-	else{
-		cout<<"Allowed a waitTimeOut of : "<< waitTimeOut <<" secs"<<endl<<endl;
-		if(!SIRC_P->waitDone(waitTimeOut)){
-			tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
+
+		//Set the run signal
+		//cout<<"Issued a run signal"<<endl;
+		if(!SIRC_P->sendRun()){
+			tempStream << "Run command failed with code " << (int) SIRC_P->getLastError();
 			error(tempStream.str());
 		} else{
-			//cout<<"User code exectution completed successfully !"<<endl<<endl;
+			//cout<<"Run command issue success !"<<endl<<endl;
 		}
-	}	
 
-	//Read the data back
-	//cout<<"Atempting to read back responses"<<endl;
-	if(!SIRC_P->sendRead(0, (numOpsRead+1), outputValues)){
-		tempStream << "Read from FPGA failed with code " << (int) SIRC_P->getLastError();
-		error(tempStream.str());
-	} else{
-		//cout<<"Read back from memory success !"<<endl<<endl;
-	}
-	end = GetTickCount();
+		//Wait up to N seconds for the execution to finish (we can compute ~500M numbers in that time)
+		if(waitTimeOut == 0){
+			//cout<<"Allowed a waitTimeOut of : 10 secs"<<endl;
+			if(!SIRC_P->waitDone(10)){
+				tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
+				error(tempStream.str());
+			} else{
+				//cout<<"User code exectution completed successfully !"<<endl<<endl;
+			}
+		}
+		else{
+			cout<<"Allowed a waitTimeOut of : "<< waitTimeOut <<" secs"<<endl<<endl;
+			if(!SIRC_P->waitDone(waitTimeOut)){
+				tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
+				error(tempStream.str());
+			} else{
+				//cout<<"User code exectution completed successfully !"<<endl<<endl;
+			}
+		}	
 
-	//Verify that the values are correct
-	cout<<"The responses are : ";
-	for(int i = 1; i < (numOpsRead+1); i++){
-		cout<<get8bitBinary((int)outputValues[i])<<" ";
+		//Read the data back
+		//cout<<"Atempting to read back responses"<<endl;
+		if(!SIRC_P->sendRead(0, (numOpsRead+1), outputValues)){
+			tempStream << "Read from FPGA failed with code " << (int) SIRC_P->getLastError();
+			error(tempStream.str());
+		} else{
+			//cout<<"Read back from memory success !"<<endl<<endl;
+		}
+		end = GetTickCount();
+
+		//Verify that the values are correct
+		cout<<endl<<"Responses : ";
+		for(int i = 1; i < (numOpsRead+1); i++){
+			cout<<get8bitBinary((int)outputValues[i])<<" ";
+			if(i==1)
+				adjustCounters(1, (int)outputValues[i]);
+			if(i==2)
+				adjustCounters(0, (int)outputValues[i]);
+		}
+		//cout<<endl<<"End of Outputs"<<endl<<endl;
+		cout << "\tReached in " << (end - start) << " ms" << endl;
 	}
-	//cout<<endl<<"End of Outputs"<<endl<<endl;
-	cout << endl << "Operation complete !" << "\tExecuted in " << (end - start) << " ms" << endl << endl;
+
+	cout<<endl<<endl<<"Final report for each bit:"<<endl;
+	for(int i=0; i<16; i++){
+		cout<<"# of 1's in bit "<<i<<" is: "<<nOfOnes[i]<<endl;
+	}
 
 
 	delete SIRC_P;
