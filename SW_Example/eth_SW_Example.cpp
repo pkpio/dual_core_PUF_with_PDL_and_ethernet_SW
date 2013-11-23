@@ -47,12 +47,12 @@ using namespace System::Collections;
 
 
 //################################	Start of Global variables ####################################
-#define runSize 1000 //# times output should be evaluated for same challenge
+#define runSize 100 //# times output should be evaluated for same challenge
 
 //Configuration bits as integer arrays.
 //The code will attempt to read values from file and if that fails then the below values will be used
-int configTop[16]	 = {0,2,0,0,0,0,0,0};
-int configBottom[16] = {0,0,0,0,0,0,255,255};
+int configTop[16]	 = {1,2,3,4,5,6,7,8};
+int configBottom[16] = {8,7,6,5,4,3,2,1};
 
 uint32_t A = 0xffffffff;//operand A
 uint32_t B = 0x00000000;//operand B
@@ -62,6 +62,10 @@ uint32_t numOpsRead = 2;	//read Length;
 
 //For couting #1's in 100 runs for each bits. Initialized to 0 for each bit.
 int nOfOnes[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+//Tuning level = # 1's in topline - # 1's in bottom line. Taken from text file and used for naming output file.
+//Default used when file is invalid
+int tuningLevelDefault = 55555;
 
 //################################	End of Global variables ####################################
 
@@ -299,11 +303,12 @@ int main(int argc, char* argv[]){
 	string configVector;
 	ifstream configFile ("config.txt");
 	char num[10];
-	int configFileData[16];
+	int configFileData[17];
 	int n = 0;
 	if (configFile.is_open()){
 		cout << endl << "Reading from config file..." << endl;
-		while (configFile.good() && n!=16){
+		while (configFile.good() && n!=17){
+			//17th value is tuning level
 			configFile.getline (num, 256, ',');
 			configFileData[n] = atoi(num);
 			n++;
@@ -313,9 +318,10 @@ int main(int argc, char* argv[]){
 		cout << endl << "Unable to open file challenges file. Assigning default challenges.." << endl;
 	}
 
-	//Deciding the source of config bits
-	if(n==16)
+	if(n==17)
 		configSource = 1;
+	else
+		cout<<"Invalid data format in config file. Will use default config data. Please correct."<<endl;
 
 	
 	//cout << "Data sending phase started..." << endl;
@@ -345,7 +351,7 @@ int main(int argc, char* argv[]){
 	if(!configSource){
 		for(int i = 0; i < 8; i++){
 			inputValues[i+8] = configBottom[i];
-			cout<<(int)inputValues[i]<<", ";
+			cout<<(int)inputValues[i+8]<<", ";
 		}
 	} else{
 		for(int i = 0; i < 8; i++){
@@ -437,11 +443,79 @@ int main(int argc, char* argv[]){
 		//cout<<endl<<"End of Outputs"<<endl<<endl;
 		cout << "\tReached in " << (end - start) << " ms" << endl;
 	}
+//###########################################     End of execution    ###############################################################
 
-	cout<<endl<<endl<<"Final report for each bit:"<<endl;
+
+
+
+//################################################      Reports    ###################################################################
+
+	//Final report
+	cout<<endl<<endl<<"Final report for each bit:"<<endl<<endl;
 	for(int i=0; i<16; i++){
 		cout<<"# of 1's in bit "<<i<<" is: "<<nOfOnes[i]<<endl;
 	}
+
+	//Displaying config for one final time. Last display was long back.
+	cout<<endl<<endl<<"Config used :"<<endl;
+	cout<<"Top line: ";
+	for(int i = 0; i < 8; i++){
+		cout<<(int)inputValues[i]<<", ";
+	}
+
+	cout<<endl<<"Bottom line: ";
+	for(int i = 8; i < 16; i++){
+		cout<<(int)inputValues[i]<<", ";
+	}
+	cout<<endl<<endl<<endl;
+	
+//################################################      End of report    ###################################################################
+
+
+
+//###########################################     Writing results to files    ###############################################################
+	std::string tuningLevel;
+    std::stringstream out;
+
+	//Tuning level to be taken from file
+	if(configSource){
+		out<<configFileData[16];
+	}
+	//Default tuning level. The file is probably corrupted/invalid
+	else{
+		out<<tuningLevelDefault;
+	}
+	tuningLevel = out.str();
+
+
+	//Writing Final report and config data to text file
+	string outFileName = "stage1_TL= "+tuningLevel+".txt";
+	ofstream outfile (outFileName);
+
+	//Writing final report
+	outfile<<"Final report for each bit:"<<endl<<endl;
+	for(int i=0; i<16; i++){
+		outfile<<"# of 1's in bit "<<i<<" is: "<<nOfOnes[i]<<endl;
+	}
+
+	//Writing the Config
+	outfile<<endl<<endl<<"Config used :"<<endl;
+	outfile<<"Top line: ";
+	for(int i = 0; i < 8; i++){
+		outfile<<(int)inputValues[i]<<", ";
+	}
+
+	outfile<<endl<<"Bottom line: ";
+	for(int i = 8; i < 16; i++){
+		outfile<<(int)inputValues[i]<<", ";
+	}
+
+	outfile<<endl<<endl<<"# of runs: "<<runSize;
+	outfile.close();
+
+//###########################################     End of writing    ###############################################################
+
+	
 
 
 	delete SIRC_P;
