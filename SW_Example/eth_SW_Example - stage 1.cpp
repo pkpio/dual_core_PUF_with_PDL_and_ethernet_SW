@@ -39,6 +39,7 @@
 
 #include "sirc_internal.h"
 #include "display.h"
+
 using namespace std;
 using namespace System;
 using namespace System::IO;
@@ -46,15 +47,14 @@ using namespace System::Collections;
 
 
 //################################	Start of Global variables ####################################
-#define runSize 1 //# times output should be evaluated for same challenge
-#define challengeLoopSize 1 //# different random challenges to be applied
+#define runSize 100 //# times output should be evaluated for same challenge
 
 //Configuration bits as integer arrays.
 //The code will attempt to read values from file and if that fails then the below values will be used
 int configTop[16]	 = {1,2,3,4,5,6,7,8};
 int configBottom[16] = {8,7,6,5,4,3,2,1};
 
-uint32_t A = 0xffff0000;//operand A
+uint32_t A = 0xffffffff;//operand A
 uint32_t B = 0x00000000;//operand B
 	
 uint32_t numOpsWrite = 16;	//write Length;
@@ -82,36 +82,11 @@ void error(string inErr){
 	exit(-1);
 }
 
-uint32_t get32bitRandNum(){
-	//Generate 4 8-bit random numbers
-	int n1 = rand() % 256;
-	int n2 = rand() % 256;
-	int n3 = rand() % 256;
-	int n4 = rand() % 256;
-
-	uint32_t reqRandNum = n4*pow(2.0,24) + n3*pow(2.0,16) + n2*pow(2.0,8) + n1;
-
-	return reqRandNum;
-}
-
 string get8bitBinary(int n){
 	int k;
 	std::string s;
     std::stringstream out;
 	for(int i=7; i>=0; i--){
-		k = n/(pow(2.0,i));
-		n = n%((int)pow(2.0,i));
-		out<<k;
-		s = out.str();
-	}
-	return s;
-}
-
-string get32bitBinary(uint32_t n){
-	uint32_t k;
-	std::string s;
-    std::stringstream out;
-	for(int i=31; i>=0; i--){
 		k = n/(pow(2.0,i));
 		n = n%((int)pow(2.0,i));
 		out<<k;
@@ -140,12 +115,6 @@ void adjustCounters(bool byteNum, int val){
 				nOfOnes[i+8]++;
 			val = val%((int)pow(2.0,i));
 		}
-	}
-}
-
-void resetCounters(){
-	for(int i=0; i<16; i++){
-		nOfOnes[i] = 0;
 	}
 }
 
@@ -394,161 +363,155 @@ int main(int argc, char* argv[]){
 	
 	//cout<<endl<<"End of inputs. Data ready."<<endl<<endl;
 
+
     LogIt(LOGIT_TIME_MARKER);
 	start = GetTickCount();
-
-
-//############################################## CHALLENEGE LOOPING STARTS HERE ##################################################	
-//################################################################################################################################	
-
-	for (int challLoop = 0; challLoop < challengeLoopSize; challLoop++) {
-		A = get32bitRandNum();
-		B = get32bitRandNum();
-
-		//Set parameter register 0 to the operand A
-		if(!SIRC_P->sendParamRegisterWrite(0, A)){
-			tempStream << "Parameter register write failed with code " << (int) SIRC_P->getLastError();
-			error(tempStream.str());
-		}
-		//Set parameter register 1 to the operand B
-		if(!SIRC_P->sendParamRegisterWrite(1, B)){
-			tempStream << "Parameter register write failed with code " << (int) SIRC_P->getLastError();
-			error(tempStream.str());
-		}
-
-
-		//Next, send the input data
-		//Start writing at address 0
-	//############################################## SAME CHALLENEGE LOOPING STARTS HERE ###########################################		
-		for(int i=0; i<runSize; i++){
-			cout<<endl<<"Run #"<<i;
-
-			//cout<<"Writing inputs to FPGA..."<<endl;
-			if(!SIRC_P->sendWrite(0, numOpsWrite, inputValues)){
-				tempStream << "Write to FPGA failed with code " << (int) SIRC_P->getLastError();
-				error(tempStream.str());
-			} else{
-				//cout<<"Write success !"<<endl<<endl;
-			}
-
-			//Set the run signal
-			//cout<<"Issued a run signal"<<endl;
-			if(!SIRC_P->sendRun()){
-				tempStream << "Run command failed with code " << (int) SIRC_P->getLastError();
-				error(tempStream.str());
-			} else{
-				//cout<<"Run command issue success !"<<endl<<endl;
-			}
-
-			//Wait up to N seconds for the execution to finish (we can compute ~500M numbers in that time)
-			if(waitTimeOut == 0){
-				//cout<<"Allowed a waitTimeOut of : 10 secs"<<endl;
-				if(!SIRC_P->waitDone(10)){
-					tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
-					error(tempStream.str());
-				} else{
-					//cout<<"User code exectution completed successfully !"<<endl<<endl;
-				}
-			}
-			else{
-				cout<<"Allowed a waitTimeOut of : "<< waitTimeOut <<" secs"<<endl<<endl;
-				if(!SIRC_P->waitDone(waitTimeOut)){
-					tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
-					error(tempStream.str());
-				} else{
-					//cout<<"User code exectution completed successfully !"<<endl<<endl;
-				}
-			}	
-
-			//Read the data back
-			//cout<<"Atempting to read back responses"<<endl;
-			if(!SIRC_P->sendRead(0, (numOpsRead+1), outputValues)){
-				tempStream << "Read from FPGA failed with code " << (int) SIRC_P->getLastError();
-				error(tempStream.str());
-			} else{
-				//cout<<"Read back from memory success !"<<endl<<endl;
-			}
-			end = GetTickCount();
-
-			//Verify that the values are correct
-			cout<<endl<<"Responses : ";
-			for(int i = 1; i < (numOpsRead+1); i++){
-				cout<<get8bitBinary((int)outputValues[i])<<" ";
-				if(i==1)
-					adjustCounters(1, (int)outputValues[i]);
-				if(i==2)
-					adjustCounters(0, (int)outputValues[i]);
-			}
-			//cout<<endl<<"End of Outputs"<<endl<<endl;
-			cout << "\tReached in " << (end - start) << " ms" << endl;
-		}
-	//###########################################     End of execution    ###############################################################
-
-
-
-
-	//################################################      Reports    ###################################################################
-
-		//Final report
-		cout<<endl<<endl<<"Final report for each bit:"<<endl<<endl;
-		for(int i=0; i<16; i++){
-			if(nOfOnes[i]>runSize/2)
-				cout<<"Final output of bit "<<i<<" is: 1"<<endl;
-			else
-				cout<<"Final output of bit "<<i<<" is: 0"<<endl;
-		}
-
-		//Displaying the operands used
-		cout<<endl<<endl<<"Operands used :"<<endl;
-		cout<<"A: "<<A;//get32bitBinary(A);
-
-		cout<<endl<<"B: "<<B;//get32bitBinary(B);
-		cout<<endl<<endl<<endl;
-		
-	//################################################      End of report    ###################################################################
-
-
-
-	//###########################################     Writing results to files    ###############################################################
-		std::string tuningLevel;
-	    std::stringstream out;
-
-		//Tuning level to be taken from file
-		if(configSource){
-			out<<configFileData[16];
-		}
-		//Default tuning level. The file is probably corrupted/invalid
-		else{
-			out<<tuningLevelDefault;
-		}
-		tuningLevel = out.str();
-
-
-		//Writing Final report and config data to text file
-		string outFileName = "stage1_TL= "+tuningLevel+".txt";
-		ofstream outfile (outFileName);
-
-		//Writing final report
-		outfile<<"Final report for each bit:"<<endl<<endl;
-		for(int i=0; i<16; i++){
-			outfile<<"# of 1's in bit "<<i<<" is: "<<nOfOnes[i]<<endl;
-		}
-
-		//Writing the Config
-		outfile<<endl<<endl<<"Config used :"<<endl;
-		outfile<<"Top line: ";
-		for(int i = 0; i < 8; i++){
-			outfile<<(int)inputValues[i]<<", ";
-		}
-
-		outfile<<endl<<"Bottom line: ";
-		for(int i = 8; i < 16; i++){
-			outfile<<(int)inputValues[i]<<", ";
-		}
-
-		outfile<<endl<<endl<<"# of runs: "<<runSize;
-		outfile.close();
+	//Set parameter register 0 to the operand A
+	if(!SIRC_P->sendParamRegisterWrite(0, A)){
+		tempStream << "Parameter register write failed with code " << (int) SIRC_P->getLastError();
+		error(tempStream.str());
 	}
+	//Set parameter register 1 to the operand B
+	if(!SIRC_P->sendParamRegisterWrite(1, B)){
+		tempStream << "Parameter register write failed with code " << (int) SIRC_P->getLastError();
+		error(tempStream.str());
+	}
+
+
+	//Next, send the input data
+	//Start writing at address 0
+//############################################## LOOPING STARTS HERE ###########################################		
+	for(int i=0; i<runSize; i++){
+		cout<<endl<<"Run #"<<i;
+
+		//cout<<"Writing inputs to FPGA..."<<endl;
+		if(!SIRC_P->sendWrite(0, numOpsWrite, inputValues)){
+			tempStream << "Write to FPGA failed with code " << (int) SIRC_P->getLastError();
+			error(tempStream.str());
+		} else{
+			//cout<<"Write success !"<<endl<<endl;
+		}
+
+		//Set the run signal
+		//cout<<"Issued a run signal"<<endl;
+		if(!SIRC_P->sendRun()){
+			tempStream << "Run command failed with code " << (int) SIRC_P->getLastError();
+			error(tempStream.str());
+		} else{
+			//cout<<"Run command issue success !"<<endl<<endl;
+		}
+
+		//Wait up to N seconds for the execution to finish (we can compute ~500M numbers in that time)
+		if(waitTimeOut == 0){
+			//cout<<"Allowed a waitTimeOut of : 10 secs"<<endl;
+			if(!SIRC_P->waitDone(10)){
+				tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
+				error(tempStream.str());
+			} else{
+				//cout<<"User code exectution completed successfully !"<<endl<<endl;
+			}
+		}
+		else{
+			cout<<"Allowed a waitTimeOut of : "<< waitTimeOut <<" secs"<<endl<<endl;
+			if(!SIRC_P->waitDone(waitTimeOut)){
+				tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
+				error(tempStream.str());
+			} else{
+				//cout<<"User code exectution completed successfully !"<<endl<<endl;
+			}
+		}	
+
+		//Read the data back
+		//cout<<"Atempting to read back responses"<<endl;
+		if(!SIRC_P->sendRead(0, (numOpsRead+1), outputValues)){
+			tempStream << "Read from FPGA failed with code " << (int) SIRC_P->getLastError();
+			error(tempStream.str());
+		} else{
+			//cout<<"Read back from memory success !"<<endl<<endl;
+		}
+		end = GetTickCount();
+
+		//Verify that the values are correct
+		cout<<endl<<"Responses : ";
+		for(int i = 1; i < (numOpsRead+1); i++){
+			cout<<get8bitBinary((int)outputValues[i])<<" ";
+			if(i==1)
+				adjustCounters(1, (int)outputValues[i]);
+			if(i==2)
+				adjustCounters(0, (int)outputValues[i]);
+		}
+		//cout<<endl<<"End of Outputs"<<endl<<endl;
+		cout << "\tReached in " << (end - start) << " ms" << endl;
+	}
+//###########################################     End of execution    ###############################################################
+
+
+
+
+//################################################      Reports    ###################################################################
+
+	//Final report
+	cout<<endl<<endl<<"Final report for each bit:"<<endl<<endl;
+	for(int i=0; i<16; i++){
+		cout<<"# of 1's in bit "<<i<<" is: "<<nOfOnes[i]<<endl;
+	}
+
+	//Displaying config for one final time. Last display was long back.
+	cout<<endl<<endl<<"Config used :"<<endl;
+	cout<<"Top line: ";
+	for(int i = 0; i < 8; i++){
+		cout<<(int)inputValues[i]<<", ";
+	}
+
+	cout<<endl<<"Bottom line: ";
+	for(int i = 8; i < 16; i++){
+		cout<<(int)inputValues[i]<<", ";
+	}
+	cout<<endl<<endl<<endl;
+	
+//################################################      End of report    ###################################################################
+
+
+
+//###########################################     Writing results to files    ###############################################################
+	std::string tuningLevel;
+    std::stringstream out;
+
+	//Tuning level to be taken from file
+	if(configSource){
+		out<<configFileData[16];
+	}
+	//Default tuning level. The file is probably corrupted/invalid
+	else{
+		out<<tuningLevelDefault;
+	}
+	tuningLevel = out.str();
+
+
+	//Writing Final report and config data to text file
+	string outFileName = "stage1_TL= "+tuningLevel+".txt";
+	ofstream outfile (outFileName);
+
+	//Writing final report
+	outfile<<"Final report for each bit:"<<endl<<endl;
+	for(int i=0; i<16; i++){
+		outfile<<"# of 1's in bit "<<i<<" is: "<<nOfOnes[i]<<endl;
+	}
+
+	//Writing the Config
+	outfile<<endl<<endl<<"Config used :"<<endl;
+	outfile<<"Top line: ";
+	for(int i = 0; i < 8; i++){
+		outfile<<(int)inputValues[i]<<", ";
+	}
+
+	outfile<<endl<<"Bottom line: ";
+	for(int i = 8; i < 16; i++){
+		outfile<<(int)inputValues[i]<<", ";
+	}
+
+	outfile<<endl<<endl<<"# of runs: "<<runSize;
+	outfile.close();
 
 //###########################################     End of writing    ###############################################################
 

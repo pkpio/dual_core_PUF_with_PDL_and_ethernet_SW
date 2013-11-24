@@ -1,19 +1,12 @@
+255,255,255,255,255,255,255,255,
 0,0,0,0,0,0,0,0,
-255,255,255,255,255,0,0,0,
--40,
+99,
 
-#Line 1: config for top line
-#Line 2: config for bottom line
-#Line 3: #1's in line 1 - #1's in line 2
-
+#Line 1 is for top line
+#Line 2 is for bottom line
 Notes:
 255 - 1111 1111
 63  - 0011 1111
 15  - 0000 1111
 3   - 0000 0011
 1   - 0000 0001
-
-12 - 0000 1100
-
-
-Do NOT write anything before/in the first 2 lines
