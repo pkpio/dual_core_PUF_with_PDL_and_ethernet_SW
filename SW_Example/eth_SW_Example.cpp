@@ -5,7 +5,7 @@
 //
 // Modified by	: Praveen Kumar Pendyala
 // Created		: 11/20/13 
-// Modified		: 11/23/13
+// Modified		: 11/24/13
 //
 // Description:
 // Send 128 bits of config data and 2 32-bit operands A, B as parameters
@@ -46,22 +46,25 @@ using namespace System::Collections;
 
 
 //################################	Start of Global variables ####################################
-#define runSize 1 //# times output should be evaluated for same challenge
-#define challengeLoopSize 1 //# different random challenges to be applied
+#define runSize 10 //# times output should be evaluated for same challenge
+#define challengeLoopSize 1000 //# different random challenges to be applied
 
 //Configuration bits as integer arrays.
 //The code will attempt to read values from file and if that fails then the below values will be used
 int configTop[16]	 = {1,2,3,4,5,6,7,8};
 int configBottom[16] = {8,7,6,5,4,3,2,1};
 
-uint32_t A = 0xffff0000;//operand A
-uint32_t B = 0x00000000;//operand B
+uint32_t A = 0xffff0000;	//operand A
+uint32_t B = 0x00000000;	//operand B
 	
 uint32_t numOpsWrite = 16;	//write Length;
 uint32_t numOpsRead = 2;	//read Length;
 
 //For couting #1's in 100 runs for each bits. Initialized to 0 for each bit.
 int nOfOnes[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+//Final count of 1 response of each bit.
+int FnOfOnes[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 //Tuning level = # 1's in topline - # 1's in bottom line. Taken from text file and used for naming output file.
 //Default used when file is invalid
@@ -500,9 +503,9 @@ int main(int argc, char* argv[]){
 
 		//Displaying the operands used
 		cout<<endl<<endl<<"Operands used :"<<endl;
-		cout<<"A: "<<A;//get32bitBinary(A);
+		cout<<"A: "<< get32bitBinary(A);
 
-		cout<<endl<<"B: "<<B;//get32bitBinary(B);
+		cout<<endl<<"B: "<< get32bitBinary(B);
 		cout<<endl<<endl<<endl;
 		
 	//################################################      End of report    ###################################################################
@@ -510,28 +513,33 @@ int main(int argc, char* argv[]){
 
 
 	//###########################################     Writing results to files    ###############################################################
-		std::string tuningLevel;
+		std::string runNum;
 	    std::stringstream out;
 
-		//Tuning level to be taken from file
-		if(configSource){
-			out<<configFileData[16];
-		}
-		//Default tuning level. The file is probably corrupted/invalid
-		else{
-			out<<tuningLevelDefault;
-		}
-		tuningLevel = out.str();
+		out<<challLoop;
+		runNum = out.str();
 
 
 		//Writing Final report and config data to text file
-		string outFileName = "stage1_TL= "+tuningLevel+".txt";
+		string outFileName = "stage2_run #"+runNum+".txt";
 		ofstream outfile (outFileName);
 
+		//Displaying the operands used
+		outfile<<"Operands used :"<<endl;
+		outfile<<"A: "<< A << "  -  "<<get32bitBinary(A);
+
+		outfile<<endl<<"B: "<< B << "  -  "<<get32bitBinary(B);
+		outfile<<endl;
+
 		//Writing final report
-		outfile<<"Final report for each bit:"<<endl<<endl;
+		outfile<<endl<<endl<<"Final report for each bit:"<<endl<<endl;
 		for(int i=0; i<16; i++){
-			outfile<<"# of 1's in bit "<<i<<" is: "<<nOfOnes[i]<<endl;
+			if(nOfOnes[i]>runSize/2){
+				outfile<<"Final output of bit "<<i<<" is: 1"<<endl;
+				FnOfOnes[i]++;
+			} else{
+				outfile<<"Final output of bit "<<i<<" is: 0"<<endl;
+			}
 		}
 
 		//Writing the Config
@@ -548,10 +556,57 @@ int main(int argc, char* argv[]){
 
 		outfile<<endl<<endl<<"# of runs: "<<runSize;
 		outfile.close();
+
+		//Reset bit's 1 counts for this particular challenge
+		resetCounters();
 	}
 
 //###########################################     End of writing    ###############################################################
 
+
+//##################################################### One last write of consoldated result #####################################
+	//Writing Final report and config data to text file
+	std::string tuningLevel;
+    std::stringstream out;
+
+	//Tuning level to be taken from file
+	if(configSource){
+		out<<configFileData[16];
+	}
+	//Default tuning level. The file is probably corrupted/invalid
+	else{
+		out<<tuningLevelDefault;
+	}
+	tuningLevel = out.str();
+
+
+	//Writing Final report and config data to text file
+	string outFileName = "stage2_final_report_for _TL= "+tuningLevel+".txt";
+	ofstream outfile (outFileName);
+
+	//File heading
+	outfile << "Stage 2 final report" << endl<<endl;
+	outfile << "tuning level :" << configFileData[16] <<endl<<endl;
+
+	//Data
+	for(int i=0; i<16; i++){
+		outfile << "#1's for bit " << i << " is: " << FnOfOnes[i] << endl;
+	}
+
+	//Writing the Config
+	outfile<<endl<<endl<<"Config used :"<<endl;
+	outfile<<"Top line: ";
+	for(int i = 0; i < 8; i++){
+		outfile<<(int)inputValues[i]<<", ";
+	}
+
+	outfile<<endl<<"Bottom line: ";
+	for(int i = 8; i < 16; i++){
+		outfile<<(int)inputValues[i]<<", ";
+	}
+	
+	outfile<<endl<<endl << "# of challenges used: " << challengeLoopSize;
+	outfile.close();
 	
 
 

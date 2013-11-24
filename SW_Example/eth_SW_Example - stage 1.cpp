@@ -54,8 +54,8 @@ using namespace System::Collections;
 int configTop[16]	 = {1,2,3,4,5,6,7,8};
 int configBottom[16] = {8,7,6,5,4,3,2,1};
 
-uint32_t A = 0xffffffff;//operand A
-uint32_t B = 0x00000000;//operand B
+uint32_t A = 0xF1499052;//0xffffffff;//operand A
+uint32_t B = 0xEBE9BBF1;//0x00000000;//operand B
 	
 uint32_t numOpsWrite = 16;	//write Length;
 uint32_t numOpsRead = 2;	//read Length;

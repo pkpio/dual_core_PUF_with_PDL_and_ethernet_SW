@@ -1,9 +1,10 @@
-255,255,255,255,255,255,255,255,
 0,0,0,0,0,0,0,0,
+255,255,0,0,0,0,0,0,
 99,
 
 #Line 1 is for top line
 #Line 2 is for bottom line
+#Line 3 for TL - tuning level (#1's in Line 1 - #1's in Line 2)
 Notes:
 255 - 1111 1111
 63  - 0011 1111
