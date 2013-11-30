@@ -20,7 +20,7 @@
 //	bit15 bit14 bit13 bit12 bit11 bit10 bit9 bit8   bit7 bit6 bit5 bit4 bit3 bit2 bit1 bit0 an example of output is,
 //  00001010 10100001. Here, 0th bit is 1, 7th - 1, 8th - 1, 15th - 0 
 //
-//  STAGE 1 code
+//  STAGE 3 code
 //
 //
 #include <windows.h>
