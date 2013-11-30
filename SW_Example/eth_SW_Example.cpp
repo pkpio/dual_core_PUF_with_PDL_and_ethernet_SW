@@ -5,7 +5,7 @@
 //
 // Modified by	: Praveen Kumar Pendyala
 // Created		: 11/20/13 
-// Modified		: 11/24/13
+// Modified		: 11/26/13
 //
 // Description:
 // Send 128 bits of config data and 2 32-bit operands A, B as parameters
@@ -19,6 +19,8 @@
 //	Interpretation of response: The response of the output has to be interpreted in the format mentioned below
 //	bit15 bit14 bit13 bit12 bit11 bit10 bit9 bit8   bit7 bit6 bit5 bit4 bit3 bit2 bit1 bit0 an example of output is,
 //  00001010 10100001. Here, 0th bit is 1, 7th - 1, 8th - 1, 15th - 0 
+//
+//  STAGE 1 code
 //
 //
 #include <windows.h>
@@ -39,6 +41,7 @@
 
 #include "sirc_internal.h"
 #include "display.h"
+
 using namespace std;
 using namespace System;
 using namespace System::IO;
@@ -46,25 +49,22 @@ using namespace System::Collections;
 
 
 //################################	Start of Global variables ####################################
-#define runSize 10 //# times output should be evaluated for same challenge
-#define challengeLoopSize 1000 //# different random challenges to be applied
+#define runSize 100 //# times output should be evaluated for same challenge
+#define defaultTimeOut 30 //Time after which the code should giveup
 
 //Configuration bits as integer arrays.
 //The code will attempt to read values from file and if that fails then the below values will be used
 int configTop[16]	 = {1,2,3,4,5,6,7,8};
 int configBottom[16] = {8,7,6,5,4,3,2,1};
 
-uint32_t A = 0xffff0000;	//operand A
-uint32_t B = 0x00000000;	//operand B
+uint32_t A = 0x55555555;//55555555;//ffffffff;//operand A
+uint32_t B = 0xAAAAAAAA;//AAAAAAAA;//operand B
 	
 uint32_t numOpsWrite = 16;	//write Length;
 uint32_t numOpsRead = 2;	//read Length;
 
 //For couting #1's in 100 runs for each bits. Initialized to 0 for each bit.
 int nOfOnes[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-
-//Final count of 1 response of each bit.
-int FnOfOnes[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 //Tuning level = # 1's in topline - # 1's in bottom line. Taken from text file and used for naming output file.
 //Default used when file is invalid
@@ -85,36 +85,11 @@ void error(string inErr){
 	exit(-1);
 }
 
-uint32_t get32bitRandNum(){
-	//Generate 4 8-bit random numbers
-	int n1 = rand() % 256;
-	int n2 = rand() % 256;
-	int n3 = rand() % 256;
-	int n4 = rand() % 256;
-
-	uint32_t reqRandNum = n4*pow(2.0,24) + n3*pow(2.0,16) + n2*pow(2.0,8) + n1;
-
-	return reqRandNum;
-}
-
 string get8bitBinary(int n){
 	int k;
 	std::string s;
     std::stringstream out;
 	for(int i=7; i>=0; i--){
-		k = n/(pow(2.0,i));
-		n = n%((int)pow(2.0,i));
-		out<<k;
-		s = out.str();
-	}
-	return s;
-}
-
-string get32bitBinary(uint32_t n){
-	uint32_t k;
-	std::string s;
-    std::stringstream out;
-	for(int i=31; i>=0; i--){
 		k = n/(pow(2.0,i));
 		n = n%((int)pow(2.0,i));
 		out<<k;
@@ -143,12 +118,6 @@ void adjustCounters(bool byteNum, int val){
 				nOfOnes[i+8]++;
 			val = val%((int)pow(2.0,i));
 		}
-	}
-}
-
-void resetCounters(){
-	for(int i=0; i<16; i++){
-		nOfOnes[i] = 0;
 	}
 }
 
@@ -182,7 +151,7 @@ int main(int argc, char* argv[]){
 	char *token = NULL;
 	char *next_token = NULL;
 	uint32_t val;
-	int waitTimeOut = 0;
+	int waitTimeOut = defaultTimeOut;
 
 	//Input buffer
 	uint8_t *inputValues;
@@ -397,175 +366,117 @@ int main(int argc, char* argv[]){
 	
 	//cout<<endl<<"End of inputs. Data ready."<<endl<<endl;
 
+
     LogIt(LOGIT_TIME_MARKER);
 	start = GetTickCount();
-
-
-//############################################## CHALLENEGE LOOPING STARTS HERE ##################################################	
-//################################################################################################################################	
-
-	for (int challLoop = 0; challLoop < challengeLoopSize; challLoop++) {
-		A = get32bitRandNum();
-		B = get32bitRandNum();
-
-		//Set parameter register 0 to the operand A
-		if(!SIRC_P->sendParamRegisterWrite(0, A)){
-			tempStream << "Parameter register write failed with code " << (int) SIRC_P->getLastError();
-			error(tempStream.str());
-		}
-		//Set parameter register 1 to the operand B
-		if(!SIRC_P->sendParamRegisterWrite(1, B)){
-			tempStream << "Parameter register write failed with code " << (int) SIRC_P->getLastError();
-			error(tempStream.str());
-		}
-
-
-		//Next, send the input data
-		//Start writing at address 0
-	//############################################## SAME CHALLENEGE LOOPING STARTS HERE ###########################################		
-		for(int i=0; i<runSize; i++){
-			cout<<endl<<"Run #"<<i;
-
-			//cout<<"Writing inputs to FPGA..."<<endl;
-			if(!SIRC_P->sendWrite(0, numOpsWrite, inputValues)){
-				tempStream << "Write to FPGA failed with code " << (int) SIRC_P->getLastError();
-				error(tempStream.str());
-			} else{
-				//cout<<"Write success !"<<endl<<endl;
-			}
-
-			//Set the run signal
-			//cout<<"Issued a run signal"<<endl;
-			if(!SIRC_P->sendRun()){
-				tempStream << "Run command failed with code " << (int) SIRC_P->getLastError();
-				error(tempStream.str());
-			} else{
-				//cout<<"Run command issue success !"<<endl<<endl;
-			}
-
-			//Wait up to N seconds for the execution to finish (we can compute ~500M numbers in that time)
-			if(waitTimeOut == 0){
-				//cout<<"Allowed a waitTimeOut of : 10 secs"<<endl;
-				if(!SIRC_P->waitDone(10)){
-					tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
-					error(tempStream.str());
-				} else{
-					//cout<<"User code exectution completed successfully !"<<endl<<endl;
-				}
-			}
-			else{
-				cout<<"Allowed a waitTimeOut of : "<< waitTimeOut <<" secs"<<endl<<endl;
-				if(!SIRC_P->waitDone(waitTimeOut)){
-					tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
-					error(tempStream.str());
-				} else{
-					//cout<<"User code exectution completed successfully !"<<endl<<endl;
-				}
-			}	
-
-			//Read the data back
-			//cout<<"Atempting to read back responses"<<endl;
-			if(!SIRC_P->sendRead(0, (numOpsRead+1), outputValues)){
-				tempStream << "Read from FPGA failed with code " << (int) SIRC_P->getLastError();
-				error(tempStream.str());
-			} else{
-				//cout<<"Read back from memory success !"<<endl<<endl;
-			}
-			end = GetTickCount();
-
-			//Verify that the values are correct
-			cout<<endl<<"Responses : ";
-			for(int i = 1; i < (numOpsRead+1); i++){
-				cout<<get8bitBinary((int)outputValues[i])<<" ";
-				if(i==1)
-					adjustCounters(1, (int)outputValues[i]);
-				if(i==2)
-					adjustCounters(0, (int)outputValues[i]);
-			}
-			//cout<<endl<<"End of Outputs"<<endl<<endl;
-			cout << "\tReached in " << (end - start) << " ms" << endl;
-		}
-	//###########################################     End of execution    ###############################################################
-
-
-
-
-	//################################################      Reports    ###################################################################
-
-		//Final report
-		cout<<endl<<endl<<"Final report for each bit:"<<endl<<endl;
-		for(int i=0; i<16; i++){
-			if(nOfOnes[i]>runSize/2)
-				cout<<"Final output of bit "<<i<<" is: 1"<<endl;
-			else
-				cout<<"Final output of bit "<<i<<" is: 0"<<endl;
-		}
-
-		//Displaying the operands used
-		cout<<endl<<endl<<"Operands used :"<<endl;
-		cout<<"A: "<< get32bitBinary(A);
-
-		cout<<endl<<"B: "<< get32bitBinary(B);
-		cout<<endl<<endl<<endl;
-		
-	//################################################      End of report    ###################################################################
-
-
-
-	//###########################################     Writing results to files    ###############################################################
-		std::string runNum;
-	    std::stringstream out;
-
-		out<<challLoop;
-		runNum = out.str();
-
-
-		//Writing Final report and config data to text file
-		string outFileName = "stage2_run #"+runNum+".txt";
-		ofstream outfile (outFileName);
-
-		//Displaying the operands used
-		outfile<<"Operands used :"<<endl;
-		outfile<<"A: "<< A << "  -  "<<get32bitBinary(A);
-
-		outfile<<endl<<"B: "<< B << "  -  "<<get32bitBinary(B);
-		outfile<<endl;
-
-		//Writing final report
-		outfile<<endl<<endl<<"Final report for each bit:"<<endl<<endl;
-		for(int i=0; i<16; i++){
-			if(nOfOnes[i]>runSize/2){
-				outfile<<"Final output of bit "<<i<<" is: 1"<<endl;
-				FnOfOnes[i]++;
-			} else{
-				outfile<<"Final output of bit "<<i<<" is: 0"<<endl;
-			}
-		}
-
-		//Writing the Config
-		outfile<<endl<<endl<<"Config used :"<<endl;
-		outfile<<"Top line: ";
-		for(int i = 0; i < 8; i++){
-			outfile<<(int)inputValues[i]<<", ";
-		}
-
-		outfile<<endl<<"Bottom line: ";
-		for(int i = 8; i < 16; i++){
-			outfile<<(int)inputValues[i]<<", ";
-		}
-
-		outfile<<endl<<endl<<"# of runs: "<<runSize;
-		outfile.close();
-
-		//Reset bit's 1 counts for this particular challenge
-		resetCounters();
+	//Set parameter register 0 to the operand A
+	if(!SIRC_P->sendParamRegisterWrite(0, A)){
+		tempStream << "Parameter register write failed with code " << (int) SIRC_P->getLastError();
+		error(tempStream.str());
+	}
+	//Set parameter register 1 to the operand B
+	if(!SIRC_P->sendParamRegisterWrite(1, B)){
+		tempStream << "Parameter register write failed with code " << (int) SIRC_P->getLastError();
+		error(tempStream.str());
 	}
 
-//###########################################     End of writing    ###############################################################
+
+	//Next, send the input data
+	//Start writing at address 0
+//############################################## LOOPING STARTS HERE ###########################################		
+	for(int i=0; i<runSize; i++){
+		cout<<endl<<"Run #"<<i;
+
+		//cout<<"Writing inputs to FPGA..."<<endl;
+		if(!SIRC_P->sendWrite(0, numOpsWrite, inputValues)){
+			tempStream << "Write to FPGA failed with code " << (int) SIRC_P->getLastError();
+			error(tempStream.str());
+		} else{
+			//cout<<"Write success !"<<endl<<endl;
+		}
+
+		//Set the run signal
+		//cout<<"Issued a run signal"<<endl;
+		if(!SIRC_P->sendRun()){
+			tempStream << "Run command failed with code " << (int) SIRC_P->getLastError();
+			error(tempStream.str());
+		} else{
+			//cout<<"Run command issue success !"<<endl<<endl;
+		}
+
+		//Wait up to N seconds for the execution to finish (we can compute ~500M numbers in that time)
+		if(waitTimeOut == 0){
+			//cout<<"Allowed a waitTimeOut of : 30 secs"<<endl;
+			if(!SIRC_P->waitDone(30)){
+				tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
+				error(tempStream.str());
+			} else{
+				//cout<<"User code exectution completed successfully !"<<endl<<endl;
+			}
+		}
+		else{
+			cout<<"Allowed a waitTimeOut of : "<< waitTimeOut <<" secs"<<endl<<endl;
+			if(!SIRC_P->waitDone(waitTimeOut)){
+				tempStream << "Wait till done failed with code " << (int) SIRC_P->getLastError();
+				error(tempStream.str());
+			} else{
+				//cout<<"User code exectution completed successfully !"<<endl<<endl;
+			}
+		}	
+
+		//Read the data back
+		//cout<<"Atempting to read back responses"<<endl;
+		if(!SIRC_P->sendRead(0, (numOpsRead+1), outputValues)){
+			tempStream << "Read from FPGA failed with code " << (int) SIRC_P->getLastError();
+			error(tempStream.str());
+		} else{
+			//cout<<"Read back from memory success !"<<endl<<endl;
+		}
+		end = GetTickCount();
+
+		//Verify that the values are correct
+		cout<<endl<<"Responses : ";
+		for(int i = 1; i < (numOpsRead+1); i++){
+			cout<<get8bitBinary((int)outputValues[i])<<" ";
+			if(i==1)
+				adjustCounters(1, (int)outputValues[i]);
+			if(i==2)
+				adjustCounters(0, (int)outputValues[i]);
+		}
+		//cout<<endl<<"End of Outputs"<<endl<<endl;
+		cout << "\tReached in " << (end - start) << " ms" << endl;
+	}
+//###########################################     End of execution    ###############################################################
 
 
-//##################################################### One last write of consoldated result #####################################
-	//Writing Final report and config data to text file
+
+
+//################################################      Reports    ###################################################################
+
+	//Final report
+	cout<<endl<<endl<<"Final report for each bit:"<<endl<<endl;
+	for(int i=0; i<16; i++){
+		cout<<"# of 1's in bit "<<i<<" is: "<<nOfOnes[i]<<endl;
+	}
+
+	//Displaying config for one final time. Last display was long back.
+	cout<<endl<<endl<<"Config used :"<<endl;
+	cout<<"Top line: ";
+	for(int i = 0; i < 8; i++){
+		cout<<(int)inputValues[i]<<", ";
+	}
+
+	cout<<endl<<"Bottom line: ";
+	for(int i = 8; i < 16; i++){
+		cout<<(int)inputValues[i]<<", ";
+	}
+	cout<<endl<<endl<<endl;
+	
+//################################################      End of report    ###################################################################
+
+
+
+//###########################################     Writing results to files    ###############################################################
 	std::string tuningLevel;
     std::stringstream out;
 
@@ -581,16 +492,13 @@ int main(int argc, char* argv[]){
 
 
 	//Writing Final report and config data to text file
-	string outFileName = "stage2_final_report_for _TL= "+tuningLevel+".txt";
+	string outFileName = "stage1_TL= "+tuningLevel+".txt";
 	ofstream outfile (outFileName);
 
-	//File heading
-	outfile << "Stage 2 final report" << endl<<endl;
-	outfile << "tuning level :" << configFileData[16] <<endl<<endl;
-
-	//Data
+	//Writing final report
+	outfile<<"Final report for each bit:"<<endl<<endl;
 	for(int i=0; i<16; i++){
-		outfile << "#1's for bit " << i << " is: " << FnOfOnes[i] << endl;
+		outfile<<"# of 1's in bit "<<i<<" is: "<<nOfOnes[i]<<endl;
 	}
 
 	//Writing the Config
@@ -604,9 +512,12 @@ int main(int argc, char* argv[]){
 	for(int i = 8; i < 16; i++){
 		outfile<<(int)inputValues[i]<<", ";
 	}
-	
-	outfile<<endl<<endl << "# of challenges used: " << challengeLoopSize;
+
+	outfile<<endl<<endl<<"# of runs: "<<runSize;
 	outfile.close();
+
+//###########################################     End of writing    ###############################################################
+
 	
 
 

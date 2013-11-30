@@ -5,7 +5,7 @@
 //
 // Modified by	: Praveen Kumar Pendyala
 // Created		: 11/20/13 
-// Modified		: 11/26/13
+// Modified		: 11/30/13
 //
 // Description:
 // Send 128 bits of config data and 2 32-bit operands A, B as parameters
@@ -49,7 +49,7 @@ using namespace System::Collections;
 
 
 //################################	Start of Global variables ####################################
-#define runSize 100 //# times output should be evaluated for same challenge
+#define runSize 1000 //# times output should be evaluated for same challenge
 #define defaultTimeOut 30 //Time after which the code should giveup
 
 //Configuration bits as integer arrays.
@@ -492,7 +492,7 @@ int main(int argc, char* argv[]){
 
 
 	//Writing Final report and config data to text file
-	string outFileName = "stage1_TL= "+tuningLevel+".txt";
+	string outFileName = "stage3_TL= "+tuningLevel+".txt";
 	ofstream outfile (outFileName);
 
 	//Writing final report
